@@ -17,11 +17,12 @@ const {
    getMimeType
 } = common
 const uploadRouter = (req, res, next) => {
-   // console.log(req.body, 'req.body');
+   console.log(req.body, 'req.body');
    console.log(req.files, 'req.files');
+   const { check, data } = reqRule(req)
    //判断拦截
-   if (!reqRule(req).check) {
-      return res.status(400).json(reqRule(req).data); // 请求方式验证 
+   if (!check) {
+      return res.status(400).json(data); // 请求方式验证 
    }
    const successCode = 200
    res.status(successCode).json(toResponse({

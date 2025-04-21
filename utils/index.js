@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
-
+const fs = require('fs');
+const mime = require('mime-types');
 // 避免解析序列化抛错
 const safeParse = (data) => {
    try {
@@ -34,7 +35,7 @@ const multerEvent = {
             // 使用时间戳加上随机数作为唯一标识
             const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             const newName = `${uniqueId}${ext}`;
-            console.log(uniqueId, ext, '存储方式');
+            console.log(req.files, req.body, '存储方式');
             cb(null, newName);
          }
       });
@@ -120,6 +121,7 @@ const getMimeType = (fileName) => {
  * @property {number} 200 - 请求成功
  * @property {number} 400 - 请求方式错误
  * @property {number} 404 - 资源未找到
+ * @property {number} 406 - 资源类型不正确
  * @property {number} 500 - 服务器内部错误
  * 
  * 
@@ -137,6 +139,64 @@ const getMimeType = (fileName) => {
 const reqRule = (req) => {
    const params = convertParmas(req.body)
    // console.log(params,req.files, 'reqRule-params')
+   //资源校验
+   const validateFiles = (files, acceptRules) => {
+      const invalidFiles = [];
+      let allValid = true;
+      if (!acceptRules || acceptRules.length === 0) {
+         return { isValid, invalidFiles };
+      }
+
+      // 确保files总是数组形式
+      const fileList = Array.isArray(files) ? files : [files];
+
+
+      for (const file of fileList) {
+         const extension = path.extname(file.originalname).toLowerCase() 
+         const mimeType = file.mimetype.toLowerCase();
+         let fileValid = false;
+         
+         for (const rule of acceptRules) {
+            console.log(rule,'rule')
+            // 处理通配符情况
+            if (rule.endsWith('/*')) {
+               const category = rule.split('/*')[0];
+               if (mimeType.startsWith(category)) {
+                  fileValid = true;
+                  break;
+               }
+            }
+            // 处理具体 MIME 类型
+            else if (rule.includes('/')) {
+               if (mimeType === rule.toLowerCase()) {
+                  fileValid = true;
+                  break;
+               }
+            }
+            // 处理文件扩展名
+            else {
+               const ruleMime = mime.lookup(rule);
+               if (ruleMime && (mimeType === ruleMime || extension === rule.toLowerCase())) {
+                  fileValid = true;
+                  break;
+               }
+            }
+         }
+         // 不符合的资源都返回客户端
+         if (!fileValid) {
+            allValid = false;
+            invalidFiles.push(file);
+         }
+      }
+
+      return {
+         isValid: allValid,
+         invalidFiles: invalidFiles
+      };
+   };
+
+   const { isValid, invalidFiles } = validateFiles(req.files, params.accept)
+   console.log(isValid, invalidFiles, 'checkFilesExt')
    if (req.method !== 'POST') {
       return {
          check: false,
@@ -153,6 +213,21 @@ const reqRule = (req) => {
             code: 404,
             msg: '资源未上传',
             data: {}
+         })
+      }
+   } else if (!isValid) {  // 资源校验不通过
+      // 删除无效文件
+      req.files.forEach(file => {
+         if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+         }
+      });
+      return {
+         check: false,
+         data: toResponse({
+            code: 406,
+            msg: '所上传的资源类型有误',
+            data: invalidFiles      // 返回无效文件列表
          })
       }
    }
