@@ -141,8 +141,9 @@ const reqRule = (req) => {
    // console.log(params,req.files, 'reqRule-params')
    //资源校验
    const validateFiles = (files, acceptRules) => {
+      console.log(acceptRules,'acceptRules')
       const invalidFiles = [];
-      let allValid = true;
+      let isValid = true;
       if (!acceptRules || acceptRules.length === 0) {
          return { isValid, invalidFiles };
       }
@@ -157,7 +158,7 @@ const reqRule = (req) => {
          let fileValid = false;
          
          for (const rule of acceptRules) {
-            console.log(rule,'rule')
+            
             // 处理通配符情况
             if (rule.endsWith('/*')) {
                const category = rule.split('/*')[0];
@@ -184,14 +185,14 @@ const reqRule = (req) => {
          }
          // 不符合的资源都返回客户端
          if (!fileValid) {
-            allValid = false;
+            isValid = false;
             invalidFiles.push(file);
          }
       }
 
       return {
-         isValid: allValid,
-         invalidFiles: invalidFiles
+         isValid,
+         invalidFiles
       };
    };
 
