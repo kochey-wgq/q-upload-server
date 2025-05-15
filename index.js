@@ -8,7 +8,7 @@ const common = require('./utils');
 common.multerEvent.uploadInit(); // 初始化multer对象
 
 const {
-   uploadDir,
+   UPLOAD_DIR,
    upload
 } = common.multerEvent
 const {
@@ -16,6 +16,8 @@ const {
    toResponse,
    getMimeType
 } = common
+
+//文件上传路由
 const uploadRouter = (req, res, next) => {
    console.log(req.body, 'req.body');
    console.log(req.files, 'req.files');
@@ -34,7 +36,10 @@ const uploadRouter = (req, res, next) => {
 // 使用 cors 中间件
 app.use(cors());
 // 创建上传目录
-!fs.existsSync(uploadDir) && fs.mkdirSync(uploadDir);
+if(!fs.existsSync(UPLOAD_DIR)){
+   fs.mkdirSync(UPLOAD_DIR)
+   
+} 
 
 
 app.post('/upload', upload.array('files'), uploadRouter);

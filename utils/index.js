@@ -13,9 +13,67 @@ const safeParse = (data) => {
 }
 
 
-//文件上传单例
+//非大文件上传
+const multerChunksEvent = {
+   UPLOAD_DIR: 'largefile',       // 上传目录
+   TEMP_DIR: 'temp',            // chunk临时目录
+   COMPLETED_DIR: 'completed',  // 完成目录
+   upload: null,          // 实例化的multer对象
+   //初始化实例化的multer对象
+   uploadInit() {
+      this.upload = multer({ storage: this.storage() });
+   },
+   createDirs() {
+      const [UPLOAD_DIR, TEMP_DIR, COMPLETED_DIR] = this
+      [UPLOAD_DIR, TEMP_DIR, COMPLETED_DIR].forEach(dir => {
+         !fs.existsSync(dir) && fs.mkdirSync(dir, { recursive: true })
+      })
+   },
+   // 存储方式
+   storage() {
+      //自定义存储          
+      return multer.diskStorage({
+         // 定文件保存的目录 
+         destination: function (req, file, cb) {
+            const fileHash = req.body.fileHash
+            const chunkDir = path.resolve(this.TEMP_DIR, fileHash, 'chunks')
+            if (fs.existsSync(chunkDir)) {
+               fs.mkdirSync(chunkDir, { recursive: true })
+               // 创建元数据文件
+               const metadata = {
+                  filename: req.body.filename,
+                  fileHash,
+                  uploadStartTime: new Date().toISOString(),
+                  chunkSize: req.body.chunkSize,
+                  totalChunks: req.body.totalChunks
+               };
+               //写入元数据
+               fs.writeFileSync(
+                  path.resolve(TEMP_DIR, fileHash, 'metadata.json'),
+                  JSON.stringify(metadata, null, 2)      //缩进2字符增加可读性
+               );
+            }
+            cb(null, chunkDir);
+         },
+         // 指定文件保存的文件名
+         filename: function (req, file, cb) {
+            const ext = path.extname(file.originalname);
+            // 使用时间戳加上随机数作为唯一标识
+            const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const newName = `${uniqueId}${ext}`;
+            console.log(req.files, req.body, '存储方式');
+            cb(null, newName);
+         }
+      });
+   }
+}
+
+
+
+//大文件上传
 const multerEvent = {
    uploadDir: 'uploads',  // 上传目录
+   tempDir: 'temp',       // 临时目录 
    upload: null,          // 实例化的multer对象
    //初始化实例化的multer对象
    uploadInit() {
@@ -41,6 +99,7 @@ const multerEvent = {
       });
    }
 }
+
 //返回体格式化
 const toResponse = ({ code, msg, data }) => {
    return {
@@ -141,7 +200,7 @@ const reqRule = (req) => {
    // console.log(params,req.files, 'reqRule-params')
    //资源校验
    const validateFiles = (files, acceptRules) => {
-      console.log(acceptRules,'acceptRules')
+      console.log(acceptRules, 'acceptRules')
       const invalidFiles = [];
       let isValid = true;
       if (!acceptRules || acceptRules.length === 0) {
@@ -153,12 +212,12 @@ const reqRule = (req) => {
 
 
       for (const file of fileList) {
-         const extension = path.extname(file.originalname).toLowerCase() 
+         const extension = path.extname(file.originalname).toLowerCase()
          const mimeType = file.mimetype.toLowerCase();
          let fileValid = false;
-         
+
          for (const rule of acceptRules) {
-            
+
             // 处理通配符情况
             if (rule.endsWith('/*')) {
                const category = rule.split('/*')[0];
@@ -243,6 +302,7 @@ const reqRule = (req) => {
 //注册公共方法域
 const common = {
    multerEvent,
+   multerChunksEvent,
    reqRule,
    toResponse,
    getMimeType
