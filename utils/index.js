@@ -13,19 +13,27 @@ const safeParse = (data) => {
 }
 
 
-//非大文件上传
-const multerChunksEvent = {
-   UPLOAD_DIR: 'largefile',       // 上传目录
-   TEMP_DIR: 'temp',            // chunk临时目录
-   COMPLETED_DIR: 'completed',  // 完成目录
+//大文件上传
+const multerChunksEvent = { 
+
+   initDirs () {
+      const UPLOAD_DIR = path.resolve(process.cwd(), 'largefile')         // 上传目录
+      const TEMP_DIR = path.resolve(UPLOAD_DIR,'temp')            // chunk临时目录
+      const COMPLETED_DIR = path.resolve(TEMP_DIR,'completed')  // 完成目录
+      return {
+         UPLOAD_DIR,
+         TEMP_DIR,
+         COMPLETED_DIR
+      }
+   },
    upload: null,          // 实例化的multer对象
    //初始化实例化的multer对象
    uploadInit() {
+      this.createDirs() // 创建目录
       this.upload = multer({ storage: this.storage() });
-   },
-   createDirs() {
-      const [UPLOAD_DIR, TEMP_DIR, COMPLETED_DIR] = this
-      [UPLOAD_DIR, TEMP_DIR, COMPLETED_DIR].forEach(dir => {
+   }, 
+   createDirs() {  
+      Object.values(this.initDirs()).forEach(dir => {
          !fs.existsSync(dir) && fs.mkdirSync(dir, { recursive: true })
       })
    },
@@ -35,8 +43,9 @@ const multerChunksEvent = {
       return multer.diskStorage({
          // 定文件保存的目录 
          destination: function (req, file, cb) {
+            const { TEMP_DIR } = this.initDirs()
             const fileHash = req.body.fileHash
-            const chunkDir = path.resolve(this.TEMP_DIR, fileHash, 'chunks')
+            const chunkDir = path.resolve(TEMP_DIR, fileHash, 'chunks')
             if (fs.existsSync(chunkDir)) {
                fs.mkdirSync(chunkDir, { recursive: true })
                // 创建元数据文件
@@ -56,13 +65,8 @@ const multerChunksEvent = {
             cb(null, chunkDir);
          },
          // 指定文件保存的文件名
-         filename: function (req, file, cb) {
-            const ext = path.extname(file.originalname);
-            // 使用时间戳加上随机数作为唯一标识
-            const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            const newName = `${uniqueId}${ext}`;
-            console.log(req.files, req.body, '存储方式');
-            cb(null, newName);
+         filename: function (req, file, cb) { 
+            cb(null, req.body.chunkIndex);
          }
       });
    }
@@ -70,10 +74,9 @@ const multerChunksEvent = {
 
 
 
-//大文件上传
+//非大文件上传
 const multerEvent = {
-   uploadDir: 'uploads',  // 上传目录
-   tempDir: 'temp',       // 临时目录 
+   uploadDir: 'uploads',  // 上传目录 
    upload: null,          // 实例化的multer对象
    //初始化实例化的multer对象
    uploadInit() {

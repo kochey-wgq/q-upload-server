@@ -5,12 +5,17 @@ const fs = require('fs');
 const app = express();
 const port = 3000;
 const common = require('./utils');
-common.multerEvent.uploadInit(); // 初始化multer对象
-
+// // 非大文件上传
+// common.multerEvent.uploadInit(); // 初始化multer对象
+// const {
+//    UPLOAD_DIR,
+//    upload
+// } = common.multerEvent
+// 大文件上传
+common.multerChunksEvent.uploadInit(); // 初始化multer对象
 const {
-   UPLOAD_DIR,
-   upload
-} = common.multerEvent
+   upload 
+} = common.multerChunksEvent
 const {
    reqRule,
    toResponse,
@@ -35,14 +40,46 @@ const uploadRouter = (req, res, next) => {
 }
 // 使用 cors 中间件
 app.use(cors());
-// 创建上传目录
-if(!fs.existsSync(UPLOAD_DIR)){
-   fs.mkdirSync(UPLOAD_DIR)
-   
-} 
+// // 创建上传目录
+// if(!fs.existsSync(UPLOAD_DIR)){
+//    fs.mkdirSync(UPLOAD_DIR)
+
+// } 
+
+app.post('/upload', upload.array('chunk'), (req, res, next) => {
+   const successCode = 200
+   res.status(successCode).json(toResponse({
+      code: successCode,
+      msg: '文件上传成功',
+      data: {}
+   }));
+});
 
 
-app.post('/upload', upload.array('files'), uploadRouter);
+// check大文件切片已上传的数量
+app.post('/check', (req, res, next) => {
+   const { fileHash } = req.body;
+   // 确定分片目录路径
+   const chunkDir = path.resolve(common.multerChunksEvent.TEMP_DIR, fileHash, 'chunks');
+   // 如果目录是否存在，则创建
+   if (!fs.existsSync(common.multerChunksEvent.TEMP_DIR)) {
+      createDirs()
+   }
+   // 读取已上传的分片文件
+   const uploadedChunks = fs.readdirSync(chunkDir)
+      .filter(name => name !== 'metadata.json') // 排除元数据文件
+      .map(Number) // 转换为数字
+      .sort((a, b) => a - b); // 排序
+   const successCode = 200
+   res.status(successCode).json(toResponse({
+      code: successCode,
+      msg: '文件上传成功',
+      data: uploadedChunks
+   }));
+});
+
+
+// app.post('/upload', upload.array('files'), uploadRouter);
 
 const isExistsSync = () => {
    // 定义上传文件的存放路径，使用 __dirname 获取当前文件的路径，然后拼接 'uploads' 文件夹
@@ -164,21 +201,21 @@ app.get('/upload/:fileName', (req, res) => {
    const uploadsPath = path.join(__dirname, 'uploads');
    const files = fs.readdirSync(uploadsPath);
    const file = files.find(f => path.basename(f, path.extname(f)) === fileName);
-   const filePath = path.join(uploadsPath, file); 
+   const filePath = path.join(uploadsPath, file);
    if (!fs.existsSync(filePath)) {
       return res.status(404).json(toResponse({
          code: 404,
          msg: '文件不存在',
          data: {}
       }));
-   } 
+   }
    fs.readFile(filePath, (err, data) => {
       if (err) {
          console.error('Error reading file:', err);
          return res.status(500).send('文件读取失败');
-      } 
+      }
 
-      res.setHeader('Content-Type', getMimeType(file));  
+      res.setHeader('Content-Type', getMimeType(file));
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       res.send(data);
    });
