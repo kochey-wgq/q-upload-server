@@ -14,7 +14,8 @@ const common = require('./utils');
 // 大文件上传
 common.multerChunksEvent.uploadInit(); // 初始化multer对象
 const {
-   upload 
+   upload,
+   initDirs, 
 } = common.multerChunksEvent
 const {
    reqRule,
@@ -40,6 +41,7 @@ const uploadRouter = (req, res, next) => {
 }
 // 使用 cors 中间件
 app.use(cors());
+app.use(express.json());
 // // 创建上传目录
 // if(!fs.existsSync(UPLOAD_DIR)){
 //    fs.mkdirSync(UPLOAD_DIR)
@@ -47,6 +49,13 @@ app.use(cors());
 // } 
 
 app.post('/upload', upload.array('chunk'), (req, res, next) => {
+   console.log(req.body, 'req.body');
+   console.log(req.chunk, 'req.chunk');
+   // const { check, data } = reqRule(req)
+   // //判断拦截
+   // if (!check) {
+   //    return res.status(400).json(data); // 请求方式验证 
+   // }
    const successCode = 200
    res.status(successCode).json(toResponse({
       code: successCode,
@@ -58,12 +67,14 @@ app.post('/upload', upload.array('chunk'), (req, res, next) => {
 
 // check大文件切片已上传的数量
 app.post('/check', (req, res, next) => {
-   const { fileHash } = req.body;
+   console.log(req.body, 'req.body');
+   const { fileHash } = req.body; 
    // 确定分片目录路径
-   const chunkDir = path.resolve(common.multerChunksEvent.TEMP_DIR, fileHash, 'chunks');
-   // 如果目录是否存在，则创建
-   if (!fs.existsSync(common.multerChunksEvent.TEMP_DIR)) {
-      createDirs()
+   const chunkDir = path.resolve(initDirs().TEMP_DIR, fileHash, 'chunks');
+   console.log(fs.existsSync(chunkDir), 'chunkDir是否存在');
+   // 如果分片目录不存在，则创建
+   if (!fs.existsSync(chunkDir)) {
+      fs.mkdirSync(chunkDir,{ recursive: true })
    }
    // 读取已上传的分片文件
    const uploadedChunks = fs.readdirSync(chunkDir)

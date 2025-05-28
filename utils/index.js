@@ -19,7 +19,7 @@ const multerChunksEvent = {
    initDirs () {
       const UPLOAD_DIR = path.resolve(process.cwd(), 'largefile')         // 上传目录
       const TEMP_DIR = path.resolve(UPLOAD_DIR,'temp')            // chunk临时目录
-      const COMPLETED_DIR = path.resolve(TEMP_DIR,'completed')  // 完成目录
+      const COMPLETED_DIR = path.resolve(UPLOAD_DIR,'completed')  // 完成目录
       return {
          UPLOAD_DIR,
          TEMP_DIR,
