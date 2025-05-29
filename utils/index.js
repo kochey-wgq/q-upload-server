@@ -2,6 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const mime = require('mime-types');
+const multiparty = require('multiparty');
 // 避免解析序列化抛错
 const safeParse = (data) => {
    try {
@@ -25,12 +26,10 @@ const multerChunksEvent = {
          TEMP_DIR,
          COMPLETED_DIR
       }
-   },
-   upload: null,          // 实例化的multer对象
+   }, 
    //初始化实例化的multer对象
    uploadInit() {
-      this.createDirs() // 创建目录
-      this.upload = multer({ storage: this.storage() });
+      this.createDirs() // 创建目录 
    }, 
    createDirs() {  
       Object.values(this.initDirs()).forEach(dir => {
@@ -38,37 +37,14 @@ const multerChunksEvent = {
       })
    },
    // 存储方式
-   storage() {
-      //自定义存储          
-      return multer.diskStorage({
-         // 定文件保存的目录 
-         destination: function (req, file, cb) {
-            const { TEMP_DIR } = this.initDirs()
-            const fileHash = req.body.fileHash
-            const chunkDir = path.resolve(TEMP_DIR, fileHash, 'chunks')
-            if (fs.existsSync(chunkDir)) {
-               fs.mkdirSync(chunkDir, { recursive: true })
-               // 创建元数据文件
-               const metadata = {
-                  filename: req.body.filename,
-                  fileHash,
-                  uploadStartTime: new Date().toISOString(),
-                  chunkSize: req.body.chunkSize,
-                  totalChunks: req.body.totalChunks
-               };
-               //写入元数据
-               fs.writeFileSync(
-                  path.resolve(TEMP_DIR, fileHash, 'metadata.json'),
-                  JSON.stringify(metadata, null, 2)      //缩进2字符增加可读性
-               );
-            }
-            cb(null, chunkDir);
-         },
-         // 指定文件保存的文件名
-         filename: function (req, file, cb) { 
-            cb(null, req.body.chunkIndex);
-         }
-      });
+   storage(req) {
+      return new Promise((resolve, reject) => {
+         const form = new multiparty.Form();
+         form.parse(req, (err, fields, files) => { 
+            resolve({ fields, files})
+            reject(err)
+         })
+      })
    }
 }
 

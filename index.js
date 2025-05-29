@@ -12,9 +12,9 @@ const common = require('./utils');
 //    upload
 // } = common.multerEvent
 // 大文件上传
-common.multerChunksEvent.uploadInit(); // 初始化multer对象
+common.multerChunksEvent.uploadInit(); // 初始化大文件multer对象
 const {
-   upload,
+   storage,
    initDirs, 
 } = common.multerChunksEvent
 const {
@@ -48,9 +48,30 @@ app.use(express.json());
 
 // } 
 
-app.post('/upload', upload.array('chunk'), (req, res, next) => {
+app.post('/upload', (req, res, next) => {
    console.log(req.body, 'req.body');
-   console.log(req.chunk, 'req.chunk');
+   console.log(req.chunk, 'req.chunk'); 
+   storage(req).then(({fields, files}) => {
+      console.log(fields, files, 'fields, files');
+   })
+   // const chunkDir = path.resolve(initDirs().TEMP_DIR, fileHash, 'chunks')
+   // const fileHash = req.body.fileHash
+   // if (fs.existsSync(chunkDir)) {
+   //    fs.mkdirSync(chunkDir, { recursive: true })
+   //    // 创建元数据文件
+   //    const metadata = {
+   //       filename: req.body.filename,
+   //       fileHash,
+   //       uploadStartTime: new Date().toISOString(),
+   //       chunkSize: req.body.chunkSize,
+   //       totalChunks: req.body.totalChunks
+   //    };
+   //    //写入元数据
+   //    fs.writeFileSync(
+   //       path.resolve(TEMP_DIR, fileHash, 'metadata.json'),
+   //       JSON.stringify(metadata, null, 2)      //缩进2字符增加可读性
+   //    );
+   // }
    // const { check, data } = reqRule(req)
    // //判断拦截
    // if (!check) {
@@ -84,7 +105,7 @@ app.post('/check', (req, res, next) => {
    const successCode = 200
    res.status(successCode).json(toResponse({
       code: successCode,
-      msg: '文件上传成功',
+      msg: '文件检测',
       data: uploadedChunks
    }));
 });
