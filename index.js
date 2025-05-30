@@ -2,10 +2,11 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const fs = require('fs');
+const fse = require('fs-extra');
 const app = express();
 const port = 3000;
 const common = require('./utils');
-// // 非大文件上传
+// 非大文件上传
 // common.multerEvent.uploadInit(); // 初始化multer对象
 // const {
 //    UPLOAD_DIR,
@@ -15,12 +16,15 @@ const common = require('./utils');
 common.multerChunksEvent.uploadInit(); // 初始化大文件multer对象
 const {
    storage,
-   initDirs, 
+   initDirs,
 } = common.multerChunksEvent
+
+// 引入通用方法
 const {
    reqRule,
    toResponse,
-   getMimeType
+   getMimeType,
+   updateMetadata
 } = common
 
 //文件上传路由
@@ -48,54 +52,125 @@ app.use(express.json());
 
 // } 
 
-app.post('/upload', (req, res, next) => {
-   console.log(req.body, 'req.body');
-   console.log(req.chunk, 'req.chunk'); 
-   storage(req).then(({fields, files}) => {
-      console.log(fields, files, 'fields, files');
-   })
-   // const chunkDir = path.resolve(initDirs().TEMP_DIR, fileHash, 'chunks')
-   // const fileHash = req.body.fileHash
-   // if (fs.existsSync(chunkDir)) {
-   //    fs.mkdirSync(chunkDir, { recursive: true })
-   //    // 创建元数据文件
-   //    const metadata = {
-   //       filename: req.body.filename,
-   //       fileHash,
-   //       uploadStartTime: new Date().toISOString(),
-   //       chunkSize: req.body.chunkSize,
-   //       totalChunks: req.body.totalChunks
-   //    };
-   //    //写入元数据
-   //    fs.writeFileSync(
-   //       path.resolve(TEMP_DIR, fileHash, 'metadata.json'),
-   //       JSON.stringify(metadata, null, 2)      //缩进2字符增加可读性
-   //    );
-   // }
-   // const { check, data } = reqRule(req)
-   // //判断拦截
-   // if (!check) {
-   //    return res.status(400).json(data); // 请求方式验证 
-   // }
-   const successCode = 200
-   res.status(successCode).json(toResponse({
-      code: successCode,
-      msg: '文件上传成功',
-      data: {}
-   }));
-});
+app.post('/upload', async (req, res, next) => {
+   try {
+      console.log(req.body, 'req.body');
+      console.log(req.chunk, 'req.chunk');
 
+      // 使用await替代.then()使代码更清晰
+      const { fields, files, err } = await storage(req);
+
+      console.log(fields, files, err, 'fields, files,err');
+      // multiparty解析错误
+      if (err) {
+         console.error('解析错误:', err);
+         res.status(500).json(toResponse({
+            code: 500,
+            msg: '解析错误',
+            data: err
+         }));
+         return
+      }
+      // 优化字段提取
+      const {
+         fileHash,
+         fileName,
+         totalChunks,
+         totalChunksNum,
+         fileType,
+         chunkIndex
+      } = fields
+
+      // 检查必要字段是否存在
+      if (!fileHash[0] || !fileName[0] || !totalChunks[0]) {
+         res.status(500).json(toResponse({
+            code: 500,
+            msg: '文件上传失败，必要字段缺失',
+            data: {}
+         }));
+      }
+
+      const chunkDir = path.resolve(initDirs().TEMP_DIR, fileHash[0], 'chunks');
+
+
+      if (!fs.existsSync(chunkDir)) fs.mkdirSync(chunkDir, { recursive: true });
+
+
+
+      // 元数据创建
+      const metadata = {
+         // 文件基本信息
+         fileInfo: {
+            fileName: fileName[0],       // 原始文件名
+            fileHash: fileHash[0],      // 文件完整哈希值
+            fileSize: totalChunks[0],    // 文件总大小(字节)
+            fileType: fileType[0],      // 文件MIME类型
+            uploadStartTime: new Date().toISOString(), // 上传开始时间
+         },
+
+         // 分片信息
+         chunksInfo: {
+            totalChunksNum: Number(totalChunksNum[0]),  // 总分片数
+            chunkSize: `${Number(files.chunk[0].size)}(${(totalChunks[0] / (1024 * 1024)).toFixed(2)}MB)`,      // 每个分片大小(字节)
+            uploadedChunks: [],                   // 已上传的分片索引数组
+            lastUpdated: new Date().toISOString() // 最后更新时间
+         },
+
+         // 系统信息
+         systemInfo: {
+            storagePath: path.resolve(initDirs().TEMP_DIR, fileHash[0]),     // 文件存储路径
+            version: '1.0'              // 元数据版本
+         }
+      };
+
+      await fs.promises.writeFile(
+         path.resolve(initDirs().TEMP_DIR, fileHash[0], 'metadata.json'),
+         JSON.stringify(metadata, null, 2)
+      );
+      // 并行处理文件移动
+      await Promise.all(
+         files.chunk.map(async file =>
+            await fse.move(
+               file.path,
+               path.join(chunkDir, chunkIndex[0]),
+               {
+                  overwrite: true // 可选，是否覆盖已存在文件
+               }
+            )
+         )
+      ); 
+      
+      const successCode = 200;
+      res.status(successCode).json(toResponse({
+         code: successCode,
+         msg: '文件上传成功',
+         data: {
+            chunkSize: `${Number(files.chunk[0].size)}(${(totalChunks[0] / (1024 * 1024)).toFixed(2)}MB)`, // 每个分片大小(字节)
+            index: chunkIndex[0], // 当前分片索引
+         }
+      }));
+      // 更新元数据
+      updateMetadata(fileHash[0])
+   } catch (error) {
+      console.error('上传处理错误:', error);
+      res.status(500).json(toResponse({
+         code: 500,
+         msg: '文件上传失败',
+         data: error
+      }));
+   }
+});
 
 // check大文件切片已上传的数量
 app.post('/check', (req, res, next) => {
    console.log(req.body, 'req.body');
-   const { fileHash } = req.body; 
+   const { fileHash } = req.body;
    // 确定分片目录路径
    const chunkDir = path.resolve(initDirs().TEMP_DIR, fileHash, 'chunks');
    console.log(fs.existsSync(chunkDir), 'chunkDir是否存在');
    // 如果分片目录不存在，则创建
    if (!fs.existsSync(chunkDir)) {
-      fs.mkdirSync(chunkDir,{ recursive: true })
+      fs.mkdirSync(chunkDir, { recursive: true })
    }
    // 读取已上传的分片文件
    const uploadedChunks = fs.readdirSync(chunkDir)

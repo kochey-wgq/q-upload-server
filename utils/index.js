@@ -15,23 +15,23 @@ const safeParse = (data) => {
 
 
 //大文件上传
-const multerChunksEvent = { 
+const multerChunksEvent = {
 
-   initDirs () {
+   initDirs() {
       const UPLOAD_DIR = path.resolve(process.cwd(), 'largefile')         // 上传目录
-      const TEMP_DIR = path.resolve(UPLOAD_DIR,'temp')            // chunk临时目录
-      const COMPLETED_DIR = path.resolve(UPLOAD_DIR,'completed')  // 完成目录
+      const TEMP_DIR = path.resolve(UPLOAD_DIR, 'temp')            // chunk临时目录
+      const COMPLETED_DIR = path.resolve(UPLOAD_DIR, 'completed')  // 完成目录
       return {
          UPLOAD_DIR,
          TEMP_DIR,
          COMPLETED_DIR
       }
-   }, 
+   },
    //初始化实例化的multer对象
    uploadInit() {
       this.createDirs() // 创建目录 
-   }, 
-   createDirs() {  
+   },
+   createDirs() {
       Object.values(this.initDirs()).forEach(dir => {
          !fs.existsSync(dir) && fs.mkdirSync(dir, { recursive: true })
       })
@@ -40,9 +40,9 @@ const multerChunksEvent = {
    storage(req) {
       return new Promise((resolve, reject) => {
          const form = new multiparty.Form();
-         form.parse(req, (err, fields, files) => { 
-            resolve({ fields, files})
-            reject(err)
+         form.parse(req, (err, fields, files) => {
+            resolve({ fields, files })
+            reject({ err })
          })
       })
    }
@@ -76,8 +76,32 @@ const multerEvent = {
             cb(null, newName);
          }
       });
-   }
+   } 
 }
+
+// 更新元数据
+const updateMetadata = async (fileHash) => {
+   const metadataDir = path.resolve(multerChunksEvent.initDirs().TEMP_DIR, fileHash);
+   const metadataPath = path.join(metadataDir, 'metadata.json');
+
+   // 1. 读取现有元数据
+   const rawData = await fs.promises.readFile(metadataPath, { encoding: 'utf8' }); 
+   const metadata = JSON.parse(rawData);
+
+   // 2. 只更新可变部分 
+   const chunkDir = path.resolve(multerChunksEvent.initDirs().TEMP_DIR, fileHash, 'chunks');
+   metadata.chunksInfo.uploadedChunks = fs.readdirSync(chunkDir)
+         .filter(name => name !== 'metadata.json') // 排除元数据文件
+         .map(Number) // 转换为数字
+         .sort((a, b) => a - b); // 排序
+   metadata.chunksInfo.lastUpdated = new Date().toISOString();
+
+   // 3. 保存更新后的元数据
+   await fs.promises.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+
+   return metadata; 
+}
+
 
 //返回体格式化
 const toResponse = ({ code, msg, data }) => {
@@ -284,6 +308,7 @@ const common = {
    multerChunksEvent,
    reqRule,
    toResponse,
-   getMimeType
+   getMimeType,
+   updateMetadata
 }
 module.exports = common;
