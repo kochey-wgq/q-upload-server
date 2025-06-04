@@ -75,14 +75,14 @@ app.post('/upload', async (req, res, next) => {
       const {
          fileHash,
          fileName,
-         totalChunks,
+         totalChunksSize,
          totalChunksNum,
          fileType,
          chunkIndex
       } = fields
 
       // 检查必要字段是否存在
-      if (!fileHash[0] || !fileName[0] || !totalChunks[0]) {
+      if (!fileHash[0] || !fileName[0] || !totalChunksSize[0]) {
          res.status(500).json(toResponse({
             code: 500,
             msg: '文件上传失败，必要字段缺失',
@@ -103,7 +103,7 @@ app.post('/upload', async (req, res, next) => {
          fileInfo: {
             fileName: fileName[0],       // 原始文件名
             fileHash: fileHash[0],      // 文件完整哈希值
-            fileSize: totalChunks[0],    // 文件总大小(字节)
+            fileSize: totalChunksSize[0],    // 文件总大小(字节)
             fileType: fileType[0],      // 文件MIME类型
             uploadStartTime: new Date().toISOString(), // 上传开始时间
          },
@@ -111,7 +111,7 @@ app.post('/upload', async (req, res, next) => {
          // 分片信息
          chunksInfo: {
             totalChunksNum: Number(totalChunksNum[0]),  // 总分片数
-            chunkSize: `${Number(files.chunk[0].size)}(${(totalChunks[0] / (1024 * 1024)).toFixed(2)}MB)`,      // 每个分片大小(字节)
+            chunkSize: `${Number(files.chunk[0].size)}(${(totalChunksSize[0] / (1024 * 1024)).toFixed(2)}MB)`,      // 每个分片大小(字节)
             uploadedChunks: [],                   // 已上传的分片索引数组
             lastUpdated: new Date().toISOString() // 最后更新时间
          },
@@ -145,8 +145,9 @@ app.post('/upload', async (req, res, next) => {
          code: successCode,
          msg: '文件上传成功',
          data: {
-            chunkSize: `${Number(files.chunk[0].size)}(${(totalChunks[0] / (1024 * 1024)).toFixed(2)}MB)`, // 每个分片大小(字节)
-            index: chunkIndex[0], // 当前分片索引
+            chunkSize: Number(files.chunk[0].size), // 每个分片大小(字节)
+            index: Number(chunkIndex[0]), // 当前分片索引
+            totalChunksSize: Number(totalChunksSize[0]), // 总分大小
          }
       }));
       // 更新元数据
@@ -173,15 +174,17 @@ app.post('/check', (req, res, next) => {
       fs.mkdirSync(chunkDir, { recursive: true })
    }
    // 读取已上传的分片文件
-   const uploadedChunks = fs.readdirSync(chunkDir)
-      .filter(name => name !== 'metadata.json') // 排除元数据文件
+   const uploadedChunks = fs.readdirSync(chunkDir) 
       .map(Number) // 转换为数字
       .sort((a, b) => a - b); // 排序
    const successCode = 200
    res.status(successCode).json(toResponse({
       code: successCode,
-      msg: '文件检测',
-      data: uploadedChunks
+      msg: '已上传的分片索引列表',
+      data: { 
+         fileHash,         // 文件哈希值
+         uploadedChunks    // 索引数组 
+      }
    }));
 });
 
