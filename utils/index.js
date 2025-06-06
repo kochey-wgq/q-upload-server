@@ -14,17 +14,17 @@ const safeParse = (data) => {
 }
 
 
-//大文件上传
+//大文件上传 
 const multerChunksEvent = {
 
    initDirs() {
-      const UPLOAD_DIR = path.resolve(process.cwd(), 'largefile')         // 上传目录
+      const UPLOAD_DIR = path.resolve(process.cwd(), 'largefile')         // 上传目录 
       const TEMP_DIR = path.resolve(UPLOAD_DIR, 'temp')            // chunk临时目录
       const COMPLETED_DIR = path.resolve(UPLOAD_DIR, 'completed')  // 完成目录
       return {
          UPLOAD_DIR,
          TEMP_DIR,
-         COMPLETED_DIR
+         COMPLETED_DIR 
       }
    },
    //初始化实例化的multer对象
@@ -52,7 +52,7 @@ const multerChunksEvent = {
 
 //非大文件上传
 const multerEvent = {
-   uploadDir: 'uploads',  // 上传目录 
+   UPLOAD_DIR: 'smallFile',  // 上传目录 
    upload: null,          // 实例化的multer对象
    //初始化实例化的multer对象
    uploadInit() {
@@ -64,7 +64,7 @@ const multerEvent = {
       return multer.diskStorage({
          // 定文件保存的目录 
          destination: function (req, file, cb) {
-            cb(null, 'uploads/');
+            cb(null, 'smallFile/');
          },
          // 指定文件保存的文件名
          filename: function (req, file, cb) {

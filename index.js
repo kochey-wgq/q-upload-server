@@ -7,11 +7,11 @@ const app = express();
 const port = 3000;
 const common = require('./utils');
 // 非大文件上传
-// common.multerEvent.uploadInit(); // 初始化multer对象
-// const {
-//    UPLOAD_DIR,
-//    upload
-// } = common.multerEvent
+common.multerEvent.uploadInit(); // 初始化multer对象
+const {
+   UPLOAD_DIR,
+   upload
+} = common.multerEvent
 // 大文件上传
 common.multerChunksEvent.uploadInit(); // 初始化大文件multer对象
 const {
@@ -27,32 +27,30 @@ const {
    updateMetadata
 } = common
 
-//文件上传路由
-const uploadRouter = (req, res, next) => {
-   console.log(req.body, 'req.body');
-   console.log(req.files, 'req.files');
-   const { check, data } = reqRule(req)
-   //判断拦截
-   if (!check) {
-      return res.status(400).json(data); // 请求方式验证 
-   }
-   const successCode = 200
-   res.status(successCode).json(toResponse({
-      code: successCode,
-      msg: '文件上传成功',
-      data: req.files
-   }));
-}
 // 使用 cors 中间件
 app.use(cors());
 app.use(express.json());
-// // 创建上传目录
-// if(!fs.existsSync(UPLOAD_DIR)){
-//    fs.mkdirSync(UPLOAD_DIR)
+// 创建上传目录
+if (!fs.existsSync(UPLOAD_DIR)) {
+   fs.mkdirSync(UPLOAD_DIR)
 
-// } 
+}
 
-app.post('/upload', async (req, res, next) => {
+
+//查询创建有关chunk文件目录
+const findChunkDirs = (fileHash) => {
+   // fileHash目录路径
+   const fileHashDir = path.resolve(initDirs().TEMP_DIR, fileHash);
+   // chunk目录路径
+   const chunkDir = path.resolve(fileHashDir, 'chunks');
+   if (!fs.existsSync(chunkDir)) {
+      fs.mkdirSync(chunkDir, { recursive: true })
+   }
+   return { fileHashDir, chunkDir }
+}
+
+//大文件上传
+app.post('/upload/large', async (req, res, next) => {
    try {
       console.log(req.body, 'req.body');
       console.log(req.chunk, 'req.chunk');
@@ -138,8 +136,8 @@ app.post('/upload', async (req, res, next) => {
                }
             )
          )
-      ); 
-      
+      );
+
       const successCode = 200;
       res.status(successCode).json(toResponse({
          code: successCode,
@@ -163,38 +161,138 @@ app.post('/upload', async (req, res, next) => {
 });
 
 // check大文件切片已上传的数量
-app.post('/check', (req, res, next) => {
-   console.log(req.body, 'req.body');
+app.post('/upload/largeCheck', (req, res, next) => {
+   console.log(req.body, 'largeCheck');
    const { fileHash } = req.body;
    // 确定分片目录路径
-   const chunkDir = path.resolve(initDirs().TEMP_DIR, fileHash, 'chunks');
-   console.log(fs.existsSync(chunkDir), 'chunkDir是否存在');
-   // 如果分片目录不存在，则创建
-   if (!fs.existsSync(chunkDir)) {
-      fs.mkdirSync(chunkDir, { recursive: true })
-   }
+   const chunkDir = findChunkDirs(fileHash).chunkDir;
    // 读取已上传的分片文件
-   const uploadedChunks = fs.readdirSync(chunkDir) 
+   const uploadedChunks = fs.readdirSync(chunkDir)
       .map(Number) // 转换为数字
       .sort((a, b) => a - b); // 排序
    const successCode = 200
    res.status(successCode).json(toResponse({
       code: successCode,
       msg: '已上传的分片索引列表',
-      data: { 
+      data: {
          fileHash,         // 文件哈希值
          uploadedChunks    // 索引数组 
       }
    }));
 });
 
+// merge合并切片
+app.post('/upload/largeMerge', async (req, res, next) => {
+   console.log(req.body, 'largeMerge');
+   const { fileHash, fileName } = req.body;
+   // fileHash路径
+   const fileHashDir = findChunkDirs(fileHash).fileHashDir;
+   // 分片目录路径
+   const chunkDir = findChunkDirs(fileHash).chunkDir;
+   // 元数据文件
+   const metadataPath = path.resolve(fileHashDir, 'metadata.json');
+   // 合并完成目录路径
+   const computedPath = path.resolve(initDirs().COMPLETED_DIR);
+   // 检查元数据文件是否存在
+   if (!fs.existsSync(metadataPath)) {
+      return res.status(404).json(toResponse({
+         code: 404,
+         msg: '元数据文件不存在',
+         data: {}
+      }));
+   }
+   // 读取元数据
+   const metadata = JSON.parse(fs.readFileSync(metadataPath));
+   // 读取已上传的分片文件
+   const uploadedChunks = fs.readdirSync(chunkDir)
+      .map(Number) // 转换为数字
+      .sort((a, b) => a - b); // 排序
+   if (uploadedChunks.length !== metadata.chunksInfo.totalChunksNum) {
+      return res.status(400).json(toResponse({
+         code: 400,
+         msg: '分片数量不匹配，无法合并',
+         data: {}
+      }));
+   }
+   // 合并文件路径
+   const filePath = path.join(computedPath, fileName);
+   // 创建最终路径的写入流
+   const writeStream = fs.createWriteStream(filePath);
+   try {
+      for (const chunkPath of uploadedChunks) {
+         const chunkFilePath = path.resolve(chunkDir, chunkPath.toString());
+         const chunkBuffer = fs.readFileSync(chunkFilePath);
+         writeStream.write(chunkBuffer);
+      }
 
-// app.post('/upload', upload.array('files'), uploadRouter);
+      writeStream.end();
+
+
+      // 监听写入完成事件
+      writeStream.on('finish', () => {
+         console.log(`${fileHashDir}写入完成`);
+         //合并成功直接读取文件 
+         const filePath = path.join(computedPath, fileName);
+         fs.readFile(filePath, (err, data) => {
+            if (err) {
+               console.error('Error reading file:', err);
+               return res.status(500).json(toResponse({
+                  code: 500,
+                  msg: '读取文件失败',
+                  data: err.message
+               }));
+            }
+            // 清理临时文件
+            fs.rmSync(fileHashDir, { recursive: true, force: true });
+            const stats = fs.statSync(filePath);
+            res.status(200).json(toResponse({
+               code: 200,
+               msg: '合并分片成功',
+               data: {
+                  originalname: fileName, // 原始文件名
+                  mimetype: path.extname(fileName), // 文件的 MIME 类型（扩展名）
+                  destination: process.cwd(), // 文件存放的目录
+                  fileName: path.basename(fileName, path.extname(fileName)), // 文件名
+                  path: filePath, // 文件的完整路径
+                  size: stats.size // 文件大小
+               }
+            }));
+         });
+      })
+   } catch (error) {
+      console.error('合并失败:', error);
+      res.status(500).json(toResponse({
+         code: 500,
+         msg: '合并分片失败',
+         data: {}
+      }));
+   }
+})
+
+
+
+
+// 小文件上传
+app.post('/upload/small', upload.array('files'), (req, res, next) => {
+   console.log(req.body, 'req.body');
+   console.log(req.files, 'req.files');
+   const { check, data } = reqRule(req)
+   //判断拦截
+   if (!check) {
+      return res.status(400).json(data); // 请求方式验证 
+   }
+   const successCode = 200
+   res.status(successCode).json(toResponse({
+      code: successCode,
+      msg: '文件上传成功',
+      data: req.files
+   }));
+});
 
 const isExistsSync = () => {
-   // 定义上传文件的存放路径，使用 __dirname 获取当前文件的路径，然后拼接 'uploads' 文件夹
-   const uploadsPath = path.join(__dirname, 'uploads');
-   // 检查 uploads 文件夹是否存在
+   // 定义上传文件的存放路径，使用 __dirname 获取当前文件的路径，然后拼接 'smallFile' 文件夹
+   const uploadsPath = path.join(__dirname, 'smallFile');
+   // 检查 smallFile 文件夹是否存在
    if (!fs.existsSync(uploadsPath)) {
       return { code: 404, msg: '资源目录不存在', data: [] };
    }
@@ -226,7 +324,7 @@ app.get('/upload/resources', (req, res) => {
             fieldname: 'files', // 表单字段名称
             originalname: file, // 原始文件名
             mimetype: path.extname(file), // 文件的 MIME 类型（扩展名）
-            destination: 'uploads', // 文件存放的目录
+            destination: 'smallFile', // 文件存放的目录
             fileName: path.basename(file, path.extname(file)), // 文件名（不包含扩展名）
             path: filePath, // 文件的完整路径
             size: stats.size // 文件大小
@@ -256,7 +354,7 @@ app.get('/upload/getResource', (req, res) => {
       }));
    }
 
-   const uploadsPath = path.join(__dirname, 'uploads');
+   const uploadsPath = path.join(__dirname, 'smallFile');
    const files = fs.readdirSync(uploadsPath);
    const file = files.find(f => path.basename(f, path.extname(f)) === fileName);
    const filePath = path.join(uploadsPath, file);
@@ -286,7 +384,7 @@ app.get('/upload/getResource', (req, res) => {
             fieldname: 'files', // 表单字段名称
             originalname: fileName, // 原始文件名
             mimetype: path.extname(file), // 文件的 MIME 类型（扩展名）
-            destination: 'uploads', // 文件存放的目录
+            destination: 'smallFile', // 文件存放的目录
             fileName: path.basename(file, path.extname(file)), // 文件名
             path: filePath, // 文件的完整路径
             size: stats.size // 文件大小
@@ -308,7 +406,7 @@ app.get('/upload/:fileName', (req, res) => {
       }));
    }
 
-   const uploadsPath = path.join(__dirname, 'uploads');
+   const uploadsPath = path.join(__dirname, 'smallFile');
    const files = fs.readdirSync(uploadsPath);
    const file = files.find(f => path.basename(f, path.extname(f)) === fileName);
    const filePath = path.join(uploadsPath, file);
