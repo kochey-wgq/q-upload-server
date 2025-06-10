@@ -24,7 +24,7 @@ const multerChunksEvent = {
       return {
          UPLOAD_DIR,
          TEMP_DIR,
-         COMPLETED_DIR 
+         COMPLETED_DIR
       }
    },
    //初始化实例化的multer对象
@@ -50,12 +50,17 @@ const multerChunksEvent = {
 
 
 
-//非大文件上传
+//小文件上传
 const multerEvent = {
    UPLOAD_DIR: 'smallFile',  // 上传目录 
    upload: null,          // 实例化的multer对象
    //初始化实例化的multer对象
    uploadInit() {
+      // 创建目录
+      if (!fs.existsSync(this.UPLOAD_DIR)) {
+         fs.mkdirSync(this.UPLOAD_DIR)
+
+      }
       this.upload = multer({ storage: this.storage() });
    },
    // 存储方式
@@ -76,7 +81,7 @@ const multerEvent = {
             cb(null, newName);
          }
       });
-   } 
+   }
 }
 
 // 更新元数据
@@ -85,23 +90,70 @@ const updateMetadata = async (fileHash) => {
    const metadataPath = path.join(metadataDir, 'metadata.json');
 
    // 1. 读取现有元数据
-   const rawData = await fs.promises.readFile(metadataPath, { encoding: 'utf8' }); 
+   const rawData = await fs.promises.readFile(metadataPath, { encoding: 'utf8' });
    const metadata = JSON.parse(rawData);
 
    // 2. 只更新可变部分 
    const chunkDir = path.resolve(multerChunksEvent.initDirs().TEMP_DIR, fileHash, 'chunks');
-   metadata.chunksInfo.uploadedChunks = fs.readdirSync(chunkDir) 
-         .map(Number) // 转换为数字
-         .sort((a, b) => a - b); // 排序
+   metadata.chunksInfo.uploadedChunks = fs.readdirSync(chunkDir)
+      .map(Number) // 转换为数字
+      .sort((a, b) => a - b); // 排序
    metadata.chunksInfo.lastUpdated = new Date().toISOString();
 
    // 3. 保存更新后的元数据
    await fs.promises.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
 
-   return metadata; 
+   return metadata;
 }
 
+// 读取小文件和大文件数据
+const readdirFiles = ({ smallFilePath, largeFilePath }) => {
+   return new Promise(async res => {
+      let err = null
+      try {
+         let [fileNames1, fileNames2] = await Promise.all([
+            fs.promises.readdir(smallFilePath),
+            fs.promises.readdir(largeFilePath)
+         ])
+         let files = [
+            {
+               filePath: smallFilePath,
+               fileNames: fileNames1
+            },
+            {
+               filePath: largeFilePath,
+               fileNames: fileNames2
+            }
+         ].map(file => {
 
+
+            // 如果没有错误，将读取到的文件列表映射为资源对象数组
+            const resources = file.fileNames.map(t => {
+               // 获取每个文件的完整路径
+               const filePath = path.join(file.filePath, t);
+               // 使用 fs.statSync 方法获取文件的元数据信息（同步操作）
+               const stats = fs.statSync(filePath);
+
+               // 返回一个对象，包含文件的相关信息
+               return {
+                  fieldname: 'files', // 表单字段名称
+                  originalname: t, // 原始文件名
+                  mimetype: getMimeType(t), // 文件的 MIME 类型
+                  suffixType: path.extname(t), // 扩展名
+                  destination: 'smallFile', // 文件存放的目录
+                  fileName: path.basename(t, path.extname(t)), // 文件名（不包含扩展名）
+                  path: filePath, // 文件的完整路径
+                  size: stats.size // 文件大小
+               };
+            });
+            return resources
+         })
+         res([files, err])
+      } catch (err) {
+         res([null, err])
+      }
+   })
+}
 //返回体格式化
 const toResponse = ({ code, msg, data }) => {
    return {
@@ -308,6 +360,7 @@ const common = {
    reqRule,
    toResponse,
    getMimeType,
-   updateMetadata
+   updateMetadata,
+   readdirFiles
 }
 module.exports = common;
