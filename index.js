@@ -26,7 +26,8 @@ const {
    toResponse, // 响应体格式化
    getMimeType,   // 获取文件MIME类型
    updateMetadata,   //更新元数据（大文件）
-   readdirFiles      // 读取目录下的资源文件
+   readdirFiles,      // 读取目录下的资源文件
+   safeParse   // 安全解析JSON
 } = common
 
 // 使用 cors 中间件
@@ -160,7 +161,7 @@ app.post('/upload/large', async (req, res, next) => {
             )
          )
       );
-
+      const uploadedChunks = fs.readdirSync(chunkDir) //查询已上传的分片返回客户端做progress
       const successCode = 200;
       res.status(successCode).json(toResponse({
          code: successCode,
@@ -169,6 +170,7 @@ app.post('/upload/large', async (req, res, next) => {
             chunkSize: Number(files.chunk[0].size), // 每个分片大小(字节)
             index: Number(chunkIndex[0]), // 当前分片索引
             totalChunksSize: Number(totalChunksSize[0]), // 总分大小
+            uploadedChunks
          }
       }));
       // 更新元数据
@@ -225,7 +227,7 @@ app.post('/upload/largeMerge', async (req, res, next) => {
       }));
    }
    // 读取元数据
-   const metadata = JSON.parse(fs.readFileSync(metadataPath));
+   const metadata = safeParse(fs.readFileSync(metadataPath));
    // 读取已上传的分片文件
    const uploadedChunks = fs.readdirSync(chunkDir)
       .map(Number) // 转换为数字

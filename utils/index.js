@@ -136,7 +136,7 @@ const readdirFiles = ({ smallFilePath, largeFilePath }) => {
 
                // 返回一个对象，包含文件的相关信息
                return {
-                  fieldname: 'files', // 表单字段名称
+                  fieldname: 'files', // 表单字段名称 
                   originalname: t, // 原始文件名
                   mimetype: getMimeType(t), // 文件的 MIME 类型
                   suffixType: path.extname(t), // 扩展名
@@ -361,6 +361,7 @@ const common = {
    toResponse,
    getMimeType,
    updateMetadata,
-   readdirFiles
+   readdirFiles,
+   safeParse
 }
 module.exports = common;
