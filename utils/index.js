@@ -91,7 +91,7 @@ const updateMetadata = async (fileHash) => {
 
    // 1. 读取现有元数据
    const rawData = await fs.promises.readFile(metadataPath, { encoding: 'utf8' });
-   const metadata = JSON.parse(rawData);
+   const metadata = safeParse(JSON.parse(rawData));
 
    // 2. 只更新可变部分 
    const chunkDir = path.resolve(multerChunksEvent.initDirs().TEMP_DIR, fileHash, 'chunks');

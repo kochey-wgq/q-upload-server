@@ -110,7 +110,7 @@ app.post('/upload/large', async (req, res, next) => {
             msg: '文件上传失败，必要字段缺失',
             data: {}
          }));
-      }
+      } 
 
       const chunkDir = path.resolve(initDirs().TEMP_DIR, fileHash[0], 'chunks');
 
@@ -159,18 +159,21 @@ app.post('/upload/large', async (req, res, next) => {
                   overwrite: true // 可选，是否覆盖已存在文件
                }
             )
-         )
-      );
-      const uploadedChunks = fs.readdirSync(chunkDir) //查询已上传的分片返回客户端做progress
+         ) 
+      ); 
+      
+      const uploadedChunks = await fs.promises.readdir(chunkDir) //查询已上传的分片返回客户端做progress
+ 
       const successCode = 200;
-      res.status(successCode).json(toResponse({
+      res.status(successCode).json(toResponse({ 
          code: successCode,
          msg: '文件上传成功',
          data: {
             chunkSize: Number(files.chunk[0].size), // 每个分片大小(字节)
             index: Number(chunkIndex[0]), // 当前分片索引
             totalChunksSize: Number(totalChunksSize[0]), // 总分大小
-            uploadedChunks
+            uploadedBytes : +(files.chunk[0].size * uploadedChunks.length), // 已上传的字节数
+ 
          }
       }));
       // 更新元数据
@@ -195,50 +198,33 @@ app.post('/upload/largeCheck', (req, res, next) => {
    const uploadedChunks = fs.readdirSync(chunkDir)
       .map(Number) // 转换为数字
       .sort((a, b) => a - b); // 排序
+
    const successCode = 200
    res.status(successCode).json(toResponse({
       code: successCode,
       msg: '已上传的分片索引列表',
       data: {
          fileHash,         // 文件哈希值
-         uploadedChunks    // 索引数组 
+         uploadedChunks,    // 索引数组  
       }
    }));
 });
 
 // merge合并切片
-app.post('/upload/largeMerge', async (req, res, next) => {
+app.post('/upload/largeMerge', (req, res, next) => {
    console.log(req.body, 'largeMerge');
    const { fileHash, fileName } = req.body;
    // fileHash路径
    const fileHashDir = findChunkDirs(fileHash).fileHashDir;
    // 分片目录路径
-   const chunkDir = findChunkDirs(fileHash).chunkDir;
-   // 元数据文件
-   const metadataPath = path.resolve(fileHashDir, 'metadata.json');
+   const chunkDir = findChunkDirs(fileHash).chunkDir; 
    // 合并完成目录路径
-   const computedPath = path.resolve(initDirs().COMPLETED_DIR);
-   // 检查元数据文件是否存在
-   if (!fs.existsSync(metadataPath)) {
-      return res.status(404).json(toResponse({
-         code: 404,
-         msg: '元数据文件不存在',
-         data: {}
-      }));
-   }
-   // 读取元数据
-   const metadata = safeParse(fs.readFileSync(metadataPath));
+   const computedPath = path.resolve(initDirs().COMPLETED_DIR); 
    // 读取已上传的分片文件
    const uploadedChunks = fs.readdirSync(chunkDir)
       .map(Number) // 转换为数字
       .sort((a, b) => a - b); // 排序
-   if (uploadedChunks.length !== metadata.chunksInfo.totalChunksNum) {
-      return res.status(400).json(toResponse({
-         code: 400,
-         msg: '分片数量不匹配，无法合并',
-         data: {}
-      }));
-   }
+ 
    // 合并文件路径
    const filePath = path.join(computedPath, fileName);
    // 创建最终路径的写入流
