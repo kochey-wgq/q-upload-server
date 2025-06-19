@@ -96,7 +96,7 @@ const updateMetadata = async (fileHash) => {
    // 2. 只更新可变部分 
    const chunkDir = path.resolve(multerChunksEvent.initDirs().TEMP_DIR, fileHash, 'chunks');
    metadata.chunksInfo.uploadedChunks = fs.readdirSync(chunkDir)
-      .map(Number) // 转换为数字
+      .map(Number) // 转换为数字 
       .sort((a, b) => a - b); // 排序
    metadata.chunksInfo.lastUpdated = new Date().toISOString();
 

@@ -59,10 +59,10 @@ const isExistsSync = (res) => {
    }
    return { smallFilePath, largeFilePath }
 };
-
-
+ 
+ 
 //查询创建有关chunk文件目录
-const findChunkDirs = (fileHash) => {
+const findChunkDirs = (fileHash) => { 
    // fileHash目录路径
    const fileHashDir = path.resolve(initDirs().TEMP_DIR, fileHash);
    // chunk目录路径
