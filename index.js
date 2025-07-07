@@ -5,11 +5,28 @@ const fs = require('fs');
 const fse = require('fs-extra');
 const app = express();
 const port = 3000;
-const common = require('./utils');
+const common = require('./utils'); 
+
+// 引入通用方法
+const {
+   reqRule, //文件类型校验
+   toResponse, // 响应体格式化
+   getMimeType,   // 获取文件MIME类型
+   updateMetadata,   //更新元数据（大文件）
+   readdirFiles,      // 读取目录下的资源文件
+   createFilesHashes   // 创建/更新文件哈希值
+} = common
+
+
 // 非大文件上传
 common.multerEvent.uploadInit(); // 初始化小文件multer对象
-// 大文件上传
-common.multerChunksEvent.uploadInit(); // 初始化大文件multer对象
+~async function() {  // 自执行初始化大文件multer对象
+   // 大文件上传
+   await common.multerChunksEvent.uploadInit(); 
+   
+   
+}()
+  
 const {
    UPLOAD_DIR: SAMLL_UPLOAD_DIR,
    upload: smallUpload,
@@ -19,17 +36,7 @@ const {
    storage,
    initDirs,
 } = common.multerChunksEvent
-
-// 引入通用方法
-const {
-   reqRule, //文件类型校验
-   toResponse, // 响应体格式化
-   getMimeType,   // 获取文件MIME类型
-   updateMetadata,   //更新元数据（大文件）
-   readdirFiles,      // 读取目录下的资源文件
-   safeParse   // 安全解析JSON
-} = common
-
+ 
 // 使用 cors 中间件
 app.use(cors());
 app.use(express.json());
@@ -60,7 +67,7 @@ const isExistsSync = (res) => {
    return { smallFilePath, largeFilePath }
 };
  
- 
+  
 //查询创建有关chunk文件目录
 const findChunkDirs = (fileHash) => { 
    // fileHash目录路径
@@ -282,6 +289,21 @@ app.post('/upload/largeMerge', (req, res, next) => {
 })
 
 
+// 大文件秒传
+app.get('/upload/largeSecond',async (req,res)=>{
+   console.log(req.query, 'largeSecond');
+   const { fileHash } = req.query;
+   let hashesRes = await createFilesHashes(fileHash) 
+   const successCode = 200
+   res.status(successCode).json(toResponse({
+      code: successCode,
+      msg: '已上传的文件',
+      data: hashesRes
+   }));
+})
+
+
+
 
 
 // 小文件上传
@@ -325,6 +347,7 @@ app.get('/upload/resources', async (req, res) => {
          largeFiles
       }
    }));
+   
 });
 
 

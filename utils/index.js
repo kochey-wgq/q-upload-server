@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const mime = require('mime-types');
 const multiparty = require('multiparty');
+const CryptoJS = require('crypto');
 // 避免解析序列化抛错
 const safeParse = (data) => {
    try {
@@ -28,7 +29,7 @@ const multerChunksEvent = {
       }
    },
    //初始化实例化的multer对象
-   uploadInit() {
+   async uploadInit() {
       this.createDirs() // 创建目录 
    },
    createDirs() {
@@ -104,6 +105,39 @@ const updateMetadata = async (fileHash) => {
    await fs.promises.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
 
    return metadata;
+}
+
+
+// 获取文件的哈希值
+const getFileHash = (filePath) => {
+   const fileBuffer = fs.readFileSync(filePath);
+   const hash = CryptoJS.createHash('sha256');
+   hash.update(fileBuffer);
+   return hash.digest('hex');
+}
+
+// 生成所有文件的hashes json
+const createFilesHashes = async (fileHash) => {
+   const completeDir = multerChunksEvent.initDirs().COMPLETED_DIR;
+   const filesDir = fs.readdirSync(completeDir);
+
+   const hashes = filesDir.reduce((acc, file) => { 
+      if(file.includes('hashes.json')) return acc; // 跳过 hashes.json 文件
+      const filePath = path.join(completeDir, file);
+      const fileHash = getFileHash(filePath); // 获取文件的哈希值
+      acc[fileHash] = filePath; // 将文件名和哈希值存入对象
+      return acc;
+   }, {});
+   console.log(hashes, '生成的文件哈希值');
+
+   const hashesPath = path.join(completeDir, `hashes.json`);
+   fs.writeFileSync(hashesPath, JSON.stringify(hashes, null, 2), { encoding: 'utf8' });
+ 
+
+   // 1. 读取现有已上传的文件数据
+   const rawData = fs.readFileSync(hashesPath, { encoding: 'utf8' });
+   const hashesData = safeParse(JSON.parse(rawData));  
+   return Object.keys(hashesData).some(t => t.includes(fileHash)) ? 1 : 0; // 判断是否已上传
 }
 
 // 读取小文件和大文件数据
@@ -362,6 +396,8 @@ const common = {
    getMimeType,
    updateMetadata,
    readdirFiles,
-   safeParse
+   safeParse,
+   getFileHash,
+   createFilesHashes
 }
 module.exports = common;
