@@ -14,15 +14,14 @@
 ## 快速启动
    1. **安装依赖**：
 
-      ```bash
+
       npm install
-      ```
+
 
    2. **运行**：
 
-      ```bash
       nodemon index.js
-      ```
+
  
 
 ## 1. 小文件上传接口
