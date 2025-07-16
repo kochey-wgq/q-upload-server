@@ -80,8 +80,8 @@ const findChunkDirs = (fileHash) => {
    return { fileHashDir, chunkDir }
 }
 
-//大文件上传
-app.post('/upload/large', async (req, res, next) => {
+//大文件上传分片
+app.post('/upload/largeChunk', async (req, res, next) => {
    try {
       console.log(req.body, 'req.body');
       console.log(req.chunk, 'req.chunk');
