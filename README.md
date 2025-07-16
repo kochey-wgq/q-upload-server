@@ -10,17 +10,19 @@
 ## 客户端项目地址
 [该项目所配合的客户端地址](https://github.com/kochey-wgq/q-upload-container)
 
-1. **安装依赖**：
 
-   ```bash
-   npm install
-   ```
+## 快速启动
+   1. **安装依赖**：
 
-2. **运行**：
+      ```bash
+      npm install
+      ```
 
-   ```bash
-   nodemon index.js
-   ```
+   2. **运行**：
+
+      ```bash
+      nodemon index.js
+      ```
  
 
 ## 1. 小文件上传接口
