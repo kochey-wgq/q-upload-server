@@ -7,9 +7,9 @@
 
 本文档描述了Q-Upload-Server中所有重要接口和工具方法的参数说明，包括小文件上传、大文件分片上传、文件检查、合并等核心功能。
 
-## 客户端项目地址
-[该项目所配合的服务端地址](https://github.com/kochey-wgq/q-upload-server)
-[该项目所配合的客户端地址](https://github.com/kochey-wgq/q-upload-container)
+## 项目地址
+[服务端地址](https://github.com/kochey-wgq/q-upload-server)
+[客户端地址](https://github.com/kochey-wgq/q-upload-container)
 
 ## 快速启动
   1. **安装依赖**：
