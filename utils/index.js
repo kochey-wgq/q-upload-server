@@ -305,7 +305,11 @@ const reqRule = (req) => {
          let fileValid = false;
 
          for (const rule of acceptRules) {
-
+            // 允许所有类型的规则
+            if(acceptRules === '*') {
+               fileValid = true;
+               break;
+            }
             // 处理通配符情况
             if (rule.endsWith('/*')) {
                const category = rule.split('/*')[0];
