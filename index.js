@@ -196,9 +196,9 @@ app.post('/upload/largeChunk', async (req, res, next) => {
 });
 
 // check大文件切片已上传的数量
-app.post('/upload/largeCheck', (req, res, next) => {
-   console.log(req.body, 'largeCheck');
-   const { fileHash } = req.body;
+app.get('/upload/largeCheck', (req, res, next) => {
+   console.log(req.query, 'largeCheck');
+   const { fileHash } = req.query;
    // 确定分片目录路径
    const chunkDir = findChunkDirs(fileHash).chunkDir;
    // 读取已上传的分片文件
