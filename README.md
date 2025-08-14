@@ -11,6 +11,21 @@
 [服务端地址](https://github.com/kochey-wgq/q-upload-server)
 [客户端地址](https://github.com/kochey-wgq/q-upload-container)
 
+
+
+## 技术栈
+**Express：** 开发web 服务器，方便使用配合其他中间件。
+
+**multer：** Express 提供的处理小文件上传中间件。
+
+**multiparty：** 处理大文件分片和非文件字段。
+
+**CryptoJS：** 加解密生成所需文件的hashesJson文件
+
+**mime-types：** 获取文件的 MIME 类型
+
+**fs-extra：**  文件读写等功能。
+
 ## 快速启动
   1. **安装依赖**：
  
