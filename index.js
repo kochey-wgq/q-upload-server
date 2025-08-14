@@ -86,7 +86,7 @@ app.post('/upload/largeChunk', async (req, res, next) => {
       console.log(req.body, 'req.body');
       console.log(req.chunk, 'req.chunk');
 
-      // 使用await替代.then()使代码更清晰
+ 
       const { fields, files, err } = await storage(req);
 
       console.log(fields, files, err, 'fields, files,err');

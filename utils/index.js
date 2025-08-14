@@ -40,8 +40,8 @@ const multerChunksEvent = {
    // 存储方式
    storage(req) {
       return new Promise((resolve, reject) => {
-         const form = new multiparty.Form();
-         form.parse(req, (err, fields, files) => {
+         const form = new multiparty.Form();    // 创建 multiparty 表单解析器
+         form.parse(req, (err, fields, files) => {    
             resolve({ fields, files })
             reject({ err })
          })
